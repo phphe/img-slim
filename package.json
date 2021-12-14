@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development ts-node-dev src/main.ts",
     "build": "tsc --project ./tsconfig.production.json",
-    "prod": "cross-env NODE_ENV=production node dist/main.js"
+    "prod": "node dist/main.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.44.0",

@@ -1,4 +1,4 @@
-const env = process.env.NODE_ENV;
+const env = process.env.NODE_ENV || "production";
 const debug = env === "development";
 
 export default {
