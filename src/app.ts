@@ -9,7 +9,9 @@ import * as path from "path";
 import config from "./config";
 
 export async function createApp() {
-  const app = fastify({ logger: { level: config.debug ? "info" : "warn" } });
+  const app = fastify({
+    logger: { level: config.debug ? "info" : "warn", file: config.logFilePath },
+  });
   app.register(cors);
   app.register(staticPlugin, {
     root: path.join(process.cwd(), "./static"),
