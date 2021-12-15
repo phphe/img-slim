@@ -34,7 +34,6 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
     let item = await repo.findOne(id);
     if (item && item.success) {
       // 开始时应当还有优化空间. 考虑redis等缓存
-      console.log("existing=================================");
       return redirectToResult();
     }
     if (!item) {
