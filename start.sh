@@ -4,4 +4,4 @@ git pull
 # build
 yarn run build
 # start
-pm2 start dist/main.js --name img-slim
+pm2 start dist/main.js --name img-slim -i max
