@@ -35,9 +35,10 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       return reply.redirect(302, s3_CDN_Base_Url + originalPath);
     };
     // resolve options
-    let w: number, h: number, quality: number;
+    let w: number, h: number, wMax: number, hMax: number, quality: number;
     let t = options.split("-");
     let sizeFound = false;
+    let maxSizeFound = false;
     let qualityFound = false;
     for (const t2 of t) {
       if (!sizeFound) {
@@ -46,6 +47,15 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
           w = m[1] && parseFloat(m[1]);
           h = m[2] && parseFloat(m[2]);
           sizeFound = true;
+          continue;
+        }
+      }
+      if (!maxSizeFound) {
+        let m = t2.match(/^max(\d+)?x(\d+)?$/);
+        if (m) {
+          wMax = m[1] && parseFloat(m[1]);
+          hMax = m[2] && parseFloat(m[2]);
+          maxSizeFound = true;
           continue;
         }
       }
@@ -58,7 +68,7 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
         }
       }
     }
-    if (!w && !h && !qualityFound) {
+    if (!w && !h && !wMax && !hMax && !qualityFound) {
       throw new HTTPErrors["400"]("No valid option");
     }
     // check log
@@ -82,7 +92,7 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       item.quality_converted = quality?.toString();
       const failed = async (msg: string, error: any) => {
         item.success = false;
-        item.error = `${msg}}`;
+        item.error = msg;
         await repo.save(item);
         if (downloaded) {
           // remove local file
@@ -120,6 +130,24 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
         item.width = info.size.width;
         item.height = info.size.height;
         item.quality = info["Quality"] || info["JPEG-Quality"];
+        if (wMax && !hMax) {
+          if (item.width > wMax) {
+            w = wMax;
+            h = wMax / (item.width / item.height);
+          }
+        } else if (!wMax && hMax) {
+          if (item.height > hMax) {
+            h = hMax;
+            w = hMax * (item.width / item.height);
+          }
+        } else if (wMax && hMax) {
+          if (item.width > wMax) {
+            w = wMax;
+          }
+          if (item.height > hMax) {
+            h = hMax;
+          }
+        }
         item.size = (await fs.promises.stat(localPath)).size;
       } catch (error) {
         await failed("Failed to read image info", error);
