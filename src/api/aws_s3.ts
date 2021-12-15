@@ -26,6 +26,20 @@ const gm = GM.subClass({ imageMagick: true });
 
 const routes: FastifyPluginCallback = function (app, opts, done) {
   app.get(prefix + "/:options/*", async (req, reply) => {
+    const fixedPrefix = config.services.aws_s3.idName; // Changes will affect existing data
+    const id = MD5(
+      fixedPrefix + req.url.slice(prefix.length).split("?")[0]
+    ).toString();
+    const repo = getRepository(ConvertLog);
+    let item = await repo.findOne(id);
+    if (item && item.success) {
+      // 开始时应当还有优化空间. 考虑redis等缓存
+      console.log("existing=================================");
+      return redirectToResult();
+    }
+    if (!item) {
+      item = new ConvertLog();
+    }
     const options = req.params["options"] as string;
     const originalPath = getOriginalPath(); // originalPath is '*' and query
     let t2 = originalPath.split("?");
@@ -72,15 +86,6 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       throw new HTTPErrors["400"]("No valid option");
     }
     // check log
-    const fixedPrefix = config.services.aws_s3.idName; // Changes will affect existing data
-    const id = MD5(
-      fixedPrefix + req.url.slice(prefix.length).split("?")[0]
-    ).toString();
-    const repo = getRepository(ConvertLog);
-    let item = await repo.findOne(id);
-    if (!item) {
-      item = new ConvertLog();
-    }
     if (!item.success) {
       const filename = hp.arrayLast(originalPathWithoutQuery.split("/"));
       const ext = getFileExt(filename);
@@ -223,14 +228,17 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       // save log
       item.success = true;
       await repo.save(item);
+      return redirectToResult();
     }
-    return reply.redirect(302, s3_CDN_Base_Url + item.result);
     // functions
     function getOriginalPath() {
       let r = req.params["*"] as string;
       r = req.url.substring(req.url.indexOf(r));
       r = "/" + r;
       return r;
+    }
+    function redirectToResult() {
+      return reply.redirect(302, s3_CDN_Base_Url + item.result);
     }
   });
   //
