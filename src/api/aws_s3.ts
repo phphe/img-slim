@@ -19,31 +19,50 @@ import { downloadAndSave, genTmpPath } from "../services/download.service";
 import { getFileExt, replaceFileExt, createMarkPromise } from "../utils";
 import config from "../config";
 
-const prefix = "/a";
+const prefix = config.services.aws_s3.urlPrefix;
 const s3BaseUrl = "https://virtualtouch-3d-asset.s3.ap-east-1.amazonaws.com";
 const s3_CDN_Base_Url = "https://d3j0knsfl28cuj.cloudfront.net";
 const gm = GM.subClass({ imageMagick: true });
 
 const routes: FastifyPluginCallback = function (app, opts, done) {
-  app.get(prefix + "/:action/:options/*", async (req, reply) => {
-    const action = req.params["action"] as string;
+  app.get(prefix + "/:options/*", async (req, reply) => {
     const options = req.params["options"] as string;
-    const originalPath = ("/" + req.params["*"]) as string;
+    const originalPath = getOriginalPath(); // originalPath is '*' and query
+    let t2 = originalPath.split("?");
+    const originalPathWithoutQuery = t2[0];
+    const originalPathQuery = t2[1] ? "?" + t2[1] : "";
     const fallback = () => {
       return reply.redirect(302, s3_CDN_Base_Url + originalPath);
     };
-    if (action !== "resize") {
-      req.log.warn("TODO");
-      return fallback();
+    // resolve options
+    let w: number, h: number, quality: number;
+    let t = options.split("-");
+    let sizeFound = false;
+    let qualityFound = false;
+    for (const t2 of t) {
+      if (!sizeFound) {
+        let m = t2.match(/^(\d+)?x(\d+)?$/);
+        if (m) {
+          w = m[1] && parseFloat(m[1]);
+          h = m[2] && parseFloat(m[2]);
+          sizeFound = true;
+          continue;
+        }
+      }
+      if (!qualityFound) {
+        let m = t2.match(/^q(\d{1,3})$/);
+        if (m) {
+          quality = parseInt(m[1]);
+          qualityFound = true;
+          continue;
+        }
+      }
     }
-    let m = options.match(/^(\d+)?x(\d+)?/);
-    let w = m[1] && parseFloat(m[1]);
-    let h = m[2] && parseFloat(m[2]);
-    if (!w && !h) {
-      throw new HTTPErrors["400"]("Invalid options");
+    if (!w && !h && !qualityFound) {
+      throw new HTTPErrors["400"]("No valid option");
     }
     // check log
-    const fixedPrefix = "/aws_s3"; // Changes will affect existing data
+    const fixedPrefix = config.services.aws_s3.idName; // Changes will affect existing data
     const id = MD5(
       fixedPrefix + req.url.slice(prefix.length).split("?")[0]
     ).toString();
@@ -53,14 +72,14 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       item = new ConvertLog();
     }
     if (!item.success) {
-      const filename = hp.arrayLast(originalPath.split("/"));
+      const filename = hp.arrayLast(originalPathWithoutQuery.split("/"));
       const ext = getFileExt(filename);
       item.id = id;
-      item.action = action;
       item.path = originalPath;
       item.type = ext;
       item.width_converted = w;
       item.height_converted = h;
+      item.quality_converted = quality?.toString();
       const failed = async (msg: string, error: any) => {
         item.success = false;
         item.error = `${msg}}`;
@@ -75,7 +94,7 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       };
       // download img
       let downloaded;
-      const fullRemoteUrl = s3BaseUrl + originalPath;
+      const fullRemoteUrl = s3BaseUrl + originalPathWithoutQuery; // without query. only for current service
       const localPath = genTmpPath(filename);
       try {
         await hp.retry(() => downloadAndSave(fullRemoteUrl, localPath), 5);
@@ -97,28 +116,30 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
         } else if (!w && h) {
           w = h * (info.size.width / info.size.height);
         }
-        item.width_converted = w;
-        item.height_converted = h;
         item.type = info.format;
         item.width = info.size.width;
         item.height = info.size.height;
-        item.size = parseInt(
-          info.Filesize.substring(0, info.Filesize.length - 1)
-        );
+        item.quality = info["Quality"] || info["JPEG-Quality"];
+        item.size = (await fs.promises.stat(localPath)).size;
       } catch (error) {
         await failed("Failed to read image info", error);
         return fallback();
       }
-      // resize
-      const waitResize = createMarkPromise<void, Error>();
-      gm(localPath)
-        .resize(w, h, "!")
-        .write(localPath, function (err) {
-          err ? waitResize.reject(err) : waitResize.resolve();
-        });
+      // process img
+      const waitProcess = createMarkPromise<void, Error>();
+      let gmChain = gm(localPath);
+      if (w || h) {
+        gmChain = gmChain.resize(w, h, "!");
+      }
+      if (quality) {
+        gmChain = gmChain.quality(quality);
+      }
+      gmChain.write(localPath, function (err) {
+        err ? waitProcess.reject(err) : waitProcess.resolve();
+      });
       let mimeType: string;
       try {
-        await waitResize.promise;
+        await waitProcess.promise;
         // read converted info
         const waitInfo = createMarkPromise<GM.ImageInfo, Error>();
         gm(localPath).identify((err, value) => {
@@ -127,23 +148,25 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
         try {
           const info = await waitInfo.promise;
           item.type_converted = info.format;
-          item.size_converted = parseInt(
-            info.Filesize.substring(0, info.Filesize.length - 1)
-          );
+          item.width_converted = info.size.width;
+          item.height_converted = info.size.height;
+          item.quality_converted = info["Quality"] || info["JPEG-Quality"];
+          item.size_converted = (await fs.promises.stat(localPath)).size;
           mimeType = info["Mime type"];
         } catch (error) {
           await failed("Failed to read converted image info", error);
           return fallback();
         }
       } catch (error) {
-        await failed("Failed to resize image", error);
+        await failed("Failed to process image", error);
         return fallback();
       }
       // upload to s3
-      const newPath = replaceFileExt(
-        "/converted" + originalPath,
-        item.type_converted.toLowerCase()
-      );
+      const newPath =
+        replaceFileExt(
+          "/converted" + originalPathWithoutQuery,
+          item.type_converted.toLowerCase()
+        ) + originalPathQuery;
       item.result = newPath;
       const client = new S3Client({
         region: config.aws.defaultRegion,
@@ -154,7 +177,7 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       });
       const cmd = new PutObjectCommand({
         Bucket: config.aws.defaultBucket,
-        Key: newPath.replace(/^\//, ""), // remove '/' at left start
+        Key: newPath.replace(/^\//, "").split("?")[0], // remove '/' at left start; remove query
         ContentType: mimeType,
         Body: fs.createReadStream(localPath),
         ACL: "public-read",
@@ -174,6 +197,13 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       await repo.save(item);
     }
     return reply.redirect(302, s3_CDN_Base_Url + item.result);
+    // functions
+    function getOriginalPath() {
+      let r = req.params["*"] as string;
+      r = req.url.substring(req.url.indexOf(r));
+      r = "/" + r;
+      return r;
+    }
   });
   //
   done();
