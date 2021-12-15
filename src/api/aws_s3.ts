@@ -194,11 +194,12 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
         return fallback();
       }
       // upload to s3
-      const newPath =
-        replaceFileExt(
-          "/converted" + originalPathWithoutQuery,
-          item.type_converted.toLowerCase()
-        ) + originalPathQuery;
+      // make newPath: /converted/{source path md5}/{item.id}.{ext}{originalPathQuery}
+      const sourcePath = originalPathWithoutQuery; // like: /upload/xx/xx/aa/xx.jpg
+      const sourcePathMD5 = MD5(sourcePath).toString();
+      const newPath = `/converted/${sourcePathMD5}/${
+        item.id
+      }.${item.type_converted.toLowerCase()}${originalPathQuery}`;
       item.result = newPath;
       const client = new S3Client({
         region: config.aws.defaultRegion,
