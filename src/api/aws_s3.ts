@@ -27,9 +27,7 @@ const gm = GM.subClass({ imageMagick: true });
 const routes: FastifyPluginCallback = function (app, opts, done) {
   app.get(prefix + "/:options/*", async (req, reply) => {
     const fixedPrefix = config.services.aws_s3.idName; // Changes will affect existing data
-    const id = MD5(
-      fixedPrefix + req.url.slice(prefix.length).split("?")[0]
-    ).toString();
+    const id = MD5(fixedPrefix + req.url.slice(prefix.length)).toString();
     const repo = getRepository(ConvertLog);
     let item = await repo.findOne(id);
     if (item && item.success) {
