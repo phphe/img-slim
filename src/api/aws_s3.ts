@@ -249,6 +249,9 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
         t.push(originalPathQuery);
       }
       to = t.join("?");
+      if (req.query["_return_url"]) {
+        return to;
+      }
       return reply.redirect(302, to);
     }
   });
