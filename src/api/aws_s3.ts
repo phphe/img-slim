@@ -250,6 +250,7 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       }
       to = t.join("?");
       if (req.query["_return_url"]) {
+        to = to.replace(/(&|\?)_return_url=.*?(&|$)/, "$2");
         return to;
       }
       return reply.redirect(302, to);
