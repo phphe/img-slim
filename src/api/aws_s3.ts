@@ -236,7 +236,20 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       return r;
     }
     function redirectToResult() {
-      return reply.redirect(302, s3_CDN_Base_Url + item.result);
+      let to = s3_CDN_Base_Url + item.result; // query is stored in result. So need replace it  with current query
+      const originalPath = getOriginalPath();
+      const originalPathQuery = originalPath.split("?")[1];
+      let t = [];
+      if (to.indexOf("?")) {
+        t.push(to.split("?")[0]);
+      } else {
+        t.push(to);
+      }
+      if (originalPathQuery) {
+        t.push(originalPathQuery);
+      }
+      to = t.join("?");
+      return reply.redirect(302, to);
     }
   });
   //
