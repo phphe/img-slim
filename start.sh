@@ -2,6 +2,6 @@
 # update
 git pull
 # build
-yarn run build
+npm run build
 # start
 pm2 start dist/main.js --name img-slim -i max
