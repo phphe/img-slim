@@ -22,7 +22,7 @@ import config from "../config";
 const prefix = config.services.aws_s3.urlPrefix;
 const s3BaseUrl = "https://virtualtouch-3d-asset.s3.ap-east-1.amazonaws.com";
 const s3_CDN_Base_Url = "https://d3j0knsfl28cuj.cloudfront.net";
-const gm = GM.subClass({ imageMagick: true });
+const gm = GM.subClass({ imageMagick: false }); // use GraphicsMagick
 
 const routes: FastifyPluginCallback = function (app, opts, done) {
   app.get(prefix + "/:options/*", async (req, reply) => {
