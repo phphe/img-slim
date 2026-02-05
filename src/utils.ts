@@ -1,6 +1,4 @@
-import { rejects } from "assert";
 import * as hp from "helper-js";
-import { resolve } from "path/posix";
 
 export function getFileExt(filename: string) {
   return hp.arrayLast(filename.split("."));

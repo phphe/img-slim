@@ -13,7 +13,7 @@
     "moduleResolution": "node",
     "incremental": true
   },
-  "include": ["types", "src/**/*.ts", "src/**/*.tsx"],
+  "include": ["types", "src/**/*.ts","lib/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules"],
   "ts-node": {
     "compilerOptions": {
