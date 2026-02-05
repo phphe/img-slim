@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsup src/index.ts --format esm --clean --minify",
     "prod": "node dist/index.js",
     "prisma:reset": "prisma migrate reset",
     "prisma:migrate": "prisma migrate dev",
@@ -37,7 +37,7 @@
     "@types/mime": "^2.0.3",
     "@types/node": "^25.2.0",
     "cross-env": "^7.0.3",
-    "tsx": "^4.21.0",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
   "pnpm": {
