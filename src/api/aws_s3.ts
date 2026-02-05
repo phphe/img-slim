@@ -2,13 +2,10 @@
 import { FastifyPluginCallback } from "fastify";
 import * as HTTPErrors from "http-errors";
 import axios from "axios";
-import { ConvertLog } from "../models";
-import { getRepository } from "typeorm";
 import { MD5 } from "crypto-js";
 import * as fs from "fs";
 import * as path from "path";
 import * as hp from "helper-js";
-import { spawnSync, exec, spawn } from "child_process";
 import {
   S3Client,
   PutObjectCommand,
@@ -18,6 +15,7 @@ import * as GM from "gm";
 import { downloadAndSave, genTmpPath } from "../services/download.service";
 import { getFileExt, replaceFileExt, createMarkPromise } from "../utils";
 import config from "../config";
+import { prisma, ConvertLog } from "../db";
 
 const prefix = config.services.aws_s3.urlPrefix;
 const s3BaseUrl = "https://virtualtouch-3d-asset.s3.ap-east-1.amazonaws.com";
@@ -28,14 +26,21 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
   app.get(prefix + "/:options/*", async (req, reply) => {
     const fixedPrefix = config.services.aws_s3.idName; // Changes will affect existing data
     const id = MD5(fixedPrefix + req.url.slice(prefix.length)).toString();
-    const repo = getRepository(ConvertLog);
-    let item = await repo.findOne(id);
+    let item = await prisma.convertLog.findUnique({
+      where: { id },
+    });
     if (item && item.success) {
       // 开始时应当还有优化空间. 考虑redis等缓存
       return redirectToResult();
     }
     if (!item) {
-      item = new ConvertLog();
+      item = await prisma.convertLog.create({
+        data: {
+          id,
+          path: "",
+          type: "",
+        },
+      });
     }
     const options = req.params["options"] as string;
     const originalPath = getOriginalPath(); // originalPath is '*' and query
@@ -86,16 +91,24 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
     if (!item.success) {
       const filename = hp.arrayLast(originalPathWithoutQuery.split("/"));
       const ext = getFileExt(filename);
-      item.id = id;
-      item.path = originalPath;
-      item.type = ext;
-      item.width_converted = w;
-      item.height_converted = h;
-      item.quality_converted = quality?.toString();
+      item = await prisma.convertLog.update({
+        where: { id },
+        data: {
+          path: originalPath,
+          type: ext,
+          width_converted: w,
+          height_converted: h,
+          quality_converted: quality?.toString(),
+        },
+      });
       const failed = async (msg: string, error: any) => {
-        item.success = false;
-        item.error = msg;
-        await repo.save(item);
+        item = await prisma.convertLog.update({
+          where: { id },
+          data: {
+            success: false,
+            error: msg,
+          },
+        });
         if (downloaded) {
           // remove local file
           await fs.promises.unlink(localPath);
@@ -128,10 +141,6 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
         } else if (!w && h) {
           w = h * (info.size.width / info.size.height);
         }
-        item.type = info.format;
-        item.width = info.size.width;
-        item.height = info.size.height;
-        item.quality = info["Quality"] || info["JPEG-Quality"];
         if (wMax && !hMax) {
           if (item.width > wMax) {
             w = wMax;
@@ -150,7 +159,16 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
             h = hMax;
           }
         }
-        item.size = (await fs.promises.stat(localPath)).size;
+        item = await prisma.convertLog.update({
+          where: { id },
+          data: {
+            size: (await fs.promises.stat(localPath)).size,
+            type: info.format,
+            width: info.size.width,
+            height: info.size.height,
+            quality: info["Quality"] || info["JPEG-Quality"],
+          },
+        });
       } catch (error) {
         await failed("Failed to read image info", error);
         return fallback();
@@ -177,11 +195,16 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
         });
         try {
           const info = await waitInfo.promise;
-          item.type_converted = info.format;
-          item.width_converted = info.size.width;
-          item.height_converted = info.size.height;
-          item.quality_converted = info["Quality"] || info["JPEG-Quality"];
-          item.size_converted = (await fs.promises.stat(localPath)).size;
+          item = await prisma.convertLog.update({
+            where: { id },
+            data: {
+              type_converted: info.format,
+              width_converted: info.size.width,
+              height_converted: info.size.height,
+              quality_converted: info["Quality"] || info["JPEG-Quality"],
+              size_converted: (await fs.promises.stat(localPath)).size,
+            },
+          });
           mimeType = info["Mime type"];
         } catch (error) {
           await failed("Failed to read converted image info", error);
@@ -198,7 +221,12 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       const newPath = `/converted/${sourcePathMD5}/${
         item.id
       }.${item.type_converted.toLowerCase()}${originalPathQuery}`;
-      item.result = newPath;
+      item = await prisma.convertLog.update({
+        where: { id },
+        data: {
+          result: newPath,
+        },
+      });
       const client = new S3Client({
         region: config.aws.defaultRegion,
         credentials: {
@@ -224,8 +252,12 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
       // remove local file
       await fs.promises.unlink(localPath);
       // save log
-      item.success = true;
-      await repo.save(item);
+      item = await prisma.convertLog.update({
+        where: { id },
+        data: {
+          success: true,
+        },
+      });
       return redirectToResult();
     }
     // functions

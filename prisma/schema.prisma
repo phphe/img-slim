@@ -1,0 +1,32 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model ConvertLog {
+  id                String   @id @default(cuid())
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  path              String
+  type              String
+  type_converted    String?
+  width             Int?
+  height            Int?
+  size              Int?
+  quality           String?
+  width_converted   Int?
+  height_converted  Int?
+  size_converted    Int?
+  quality_converted String?
+  // new url
+  result            String?
+  success           Boolean  @default(false)
+  error             String?
+}

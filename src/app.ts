@@ -2,7 +2,6 @@ import "./misc/dotenv_init";
 import { fastify, FastifyInstance } from "fastify";
 import cors from "fastify-cors";
 import staticPlugin from "fastify-static";
-import { initConnection } from "./db";
 import { initAPI } from "./api/index";
 // import { initFrontendDist } from './frontend_dist'
 import * as path from "path";
@@ -19,7 +18,6 @@ export async function createApp() {
   });
   initAPI(app);
   // initFrontendDist(app)
-  await initConnection();
   return app;
 }
 
