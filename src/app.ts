@@ -1,7 +1,7 @@
 import "./misc/dotenv_init";
 import { fastify, FastifyInstance } from "fastify";
-import cors from "fastify-cors";
-import staticPlugin from "fastify-static";
+import cors from "@fastify/cors";
+import staticPlugin from "@fastify/static";
 import { initAPI } from "./api/index";
 // import { initFrontendDist } from './frontend_dist'
 import * as path from "path";

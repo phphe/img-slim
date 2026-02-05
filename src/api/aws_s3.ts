@@ -2,7 +2,7 @@
 import { FastifyPluginCallback } from "fastify";
 import * as HTTPErrors from "http-errors";
 import axios from "axios";
-import { MD5 } from "crypto-js";
+import MD5 from "crypto-js/md5.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as hp from "helper-js";
@@ -11,7 +11,7 @@ import {
   PutObjectCommand,
   PutObjectCommandInput,
 } from "@aws-sdk/client-s3";
-import * as GM from "gm";
+import GM from "gm";
 import { downloadAndSave, genTmpPath } from "../services/download.service";
 import { getFileExt, replaceFileExt, createMarkPromise } from "../utils";
 import config from "../config";

@@ -1,6 +1,6 @@
-import { PrismaClient } from "../lib/prisma/client";
+import { PrismaClient } from "./lib/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-export * from "../lib/prisma/client";
+export * from "./lib/prisma/client";
 
 const connectionString = `${process.env.DATABASE_URL}`;
 

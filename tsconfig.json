@@ -1,23 +1,13 @@
 {
   "compilerOptions": {
-    "module": "esnext",
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "es2017",
-    "sourceMap": false,
+    "target": "ES2022",
+    "module": "CommonJS", // 改为CommonJS
+    "moduleResolution": "Node10", // 匹配CommonJS的解析规则
     "outDir": "./dist",
-    "baseUrl": "./",
-    "moduleResolution": "node",
-    "incremental": true
-  },
-  "include": ["types", "src/**/*.ts","lib/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules"],
-  "ts-node": {
-    "compilerOptions": {
-      "module": "CommonJS"
-    }
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   }
 }
