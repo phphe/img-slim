@@ -285,7 +285,7 @@ const routes: FastifyPluginCallback = function (app, opts, done) {
         to = to.replace(/(&|\?)_return_url=.*?(&|$)/, "$2");
         return to;
       }
-      return reply.redirect(302, to);
+      return reply.code(302).redirect(to);
     }
   });
   //
